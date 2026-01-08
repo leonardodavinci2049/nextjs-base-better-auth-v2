@@ -1,7 +1,7 @@
 "use client";
 
 import type { ComponentProps } from "react";
-import { ActionButton } from "./ActionButton";
+import { ActionButton } from "../../app/_components/ActionButton";
 
 export function BetterAuthActionButton({
   action,
