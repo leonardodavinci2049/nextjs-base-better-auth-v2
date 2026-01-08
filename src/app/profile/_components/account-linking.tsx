@@ -2,7 +2,7 @@
 
 import { Plus, Shield, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { BetterAuthActionButton } from "@/components/auth/better-auth-action-button";
+import { BetterAuthActionButton } from "@/app/auth/login/better-auth-action-button";
 import { Card, CardContent } from "@/components/ui/card";
 
 import { authClient } from "@/lib/auth/auth-client";

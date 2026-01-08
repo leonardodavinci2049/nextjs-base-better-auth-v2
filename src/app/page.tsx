@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth/auth-client";
-import { BetterAuthActionButton } from "../components/auth/better-auth-action-button";
+import { BetterAuthActionButton } from "./auth/login/better-auth-action-button";
 
 export default function Home() {
   const [hasAdminPermission, setHasAdminPermission] = useState(false);

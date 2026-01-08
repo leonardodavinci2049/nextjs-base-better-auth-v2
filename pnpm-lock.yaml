@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@arcjet/inspect':
-        specifier: 1.0.0-beta.16
-        version: 1.0.0-beta.16
       '@arcjet/ip':
         specifier: 1.0.0-beta.16
         version: 1.0.0-beta.16
@@ -206,10 +203,6 @@ packages:
 
   '@arcjet/headers@1.0.0-beta.16':
     resolution: {integrity: sha512-jtj9cPffNV0TdWAHxYW1rIocuxDSZOQPdheKhAhz8P6tnPX7+NpLAOMzoqhLaAPQ6NsPy+F5ZsUHhcchd4L2vQ==}
-    engines: {node: '>=20'}
-
-  '@arcjet/inspect@1.0.0-beta.16':
-    resolution: {integrity: sha512-Fd4BTv2/31d7lROcO2O2EOlFtK3gQz8eHGoYs018/zS3QJmTuYGlrFr1LX1yjO6wnY03BQileIJyzTsVhrGAvA==}
     engines: {node: '>=20'}
 
   '@arcjet/ip@1.0.0-beta.16':
@@ -2280,10 +2273,6 @@ snapshots:
   '@arcjet/env@1.0.0-beta.16': {}
 
   '@arcjet/headers@1.0.0-beta.16': {}
-
-  '@arcjet/inspect@1.0.0-beta.16':
-    dependencies:
-      '@arcjet/protocol': 1.0.0-beta.16
 
   '@arcjet/ip@1.0.0-beta.16': {}
 

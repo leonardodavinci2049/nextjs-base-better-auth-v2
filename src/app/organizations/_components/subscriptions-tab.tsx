@@ -3,7 +3,7 @@
 import type { Subscription } from "@better-auth/stripe";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { BetterAuthActionButton } from "@/components/auth/better-auth-action-button";
+import { BetterAuthActionButton } from "@/app/auth/login/better-auth-action-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {

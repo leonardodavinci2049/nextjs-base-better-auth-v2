@@ -8,7 +8,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import z from "zod";
-import { BetterAuthActionButton } from "@/components/auth/better-auth-action-button";
+import { BetterAuthActionButton } from "@/app/auth/login/better-auth-action-button";
 import { Button } from "@/components/ui/button";
 import {
   Card,

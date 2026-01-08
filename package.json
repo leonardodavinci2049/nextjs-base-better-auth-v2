@@ -10,7 +10,6 @@
     "format": "npx biome format --write"
   },
   "dependencies": {
-    "@arcjet/inspect": "1.0.0-beta.16",
     "@arcjet/ip": "1.0.0-beta.16",
     "@arcjet/next": "1.0.0-beta.16",
     "@dnd-kit/core": "^6.3.1",

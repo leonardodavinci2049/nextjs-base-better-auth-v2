@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { BetterAuthActionButton } from "@/components/auth/better-auth-action-button";
+import { BetterAuthActionButton } from "@/app/auth/login/better-auth-action-button";
 import { authClient } from "@/lib/auth/auth-client";
 
 export function InviteInformation({

@@ -16,7 +16,7 @@ import { EmailVerification } from "./_components/email-verification";
 import { ForgotPassword } from "./_components/forgot-password";
 import { SignInTab } from "./_components/sign-in-tab";
 import { SignUpTab } from "./_components/sign-up-tab";
-import { SocialAuthButtons } from "./_components/social-auth-buttons";
+import { SocialAuthButtons } from "../../../components/auth/social-auth-buttons";
 
 type Tab = "signin" | "signup" | "email-verification" | "forgot-password";
 
