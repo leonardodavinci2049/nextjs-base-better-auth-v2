@@ -1,23 +1,94 @@
 import { betterAuth } from "better-auth";
 
 import { nextCookies } from "better-auth/next-js";
-import { lastLoginMethod, organization } from "better-auth/plugins";
+import { lastLoginMethod, organization, twoFactor } from "better-auth/plugins";
+import { admin as adminPlugin } from "better-auth/plugins/admin";
 import { createPool } from "mysql2/promise";
 import { Resend } from "resend";
-
 import OrganizationInvitationEmail from "@/components/emails/organization-invitation";
 import ForgotPasswordEmail from "@/components/emails/reset-password";
 import VerifyEmail from "@/components/emails/verify-email";
 import { envs } from "@/core/config/envs";
 import { getActiveOrganization } from "@/server/organizations";
+import { ac, admin, user } from "./permissions";
 
 const resend = new Resend(envs.RESEND_API_KEY);
 
-import { admin, member, owner } from "./permissions";
+import sendDeleteAccountVerificationEmail from "@/components/emails/sendDeleteAccountVerificationEmail";
+import sendEmailVerificationEmail from "@/components/emails/sendEmailVerificationEmail";
 
 export const auth = betterAuth({
   appName: "AI Sales Agent",
   secret: envs.BETTER_AUTH_SECRET,
+
+  user: {
+    changeEmail: {
+      enabled: true,
+      sendChangeEmailVerification: async ({ user, url, newEmail }) => {
+        await sendEmailVerificationEmail({
+          user: { ...user, email: newEmail },
+          url,
+        });
+      },
+    },
+    deleteUser: {
+      enabled: true,
+      sendDeleteAccountVerification: async ({ user, url }) => {
+        await sendDeleteAccountVerificationEmail({
+          userName: user.name,
+          confirmationUrl: url,
+        });
+      },
+    },
+    additionalFields: {
+      favoriteNumber: {
+        type: "number",
+        required: true,
+      },
+    },
+  },
+
+  emailAndPassword: {
+    enabled: true,
+    requireEmailVerification: true,
+    sendResetPassword: async ({ user, url }) => {
+      const response = await resend.emails.send({
+        from: `${envs.EMAIL_SENDER_NAME} <${envs.EMAIL_SENDER_ADDRESS}>`,
+        to: user.email,
+        subject: "Reset your password",
+        react: ForgotPasswordEmail({
+          username: user.name,
+          resetUrl: url,
+          userEmail: user.email,
+        }),
+      });
+
+      if (response.error) {
+        console.error("Failed to send email:", response.error);
+      } else {
+        console.log("Email sent successfully:", response.data);
+      }
+    },
+  },
+
+  emailVerification: {
+    autoSignInAfterVerification: true,
+    sendOnSignUp: true,
+    sendVerificationEmail: async ({ user, url }) => {
+      await resend.emails.send({
+        from: `${envs.EMAIL_SENDER_NAME} <${envs.EMAIL_SENDER_ADDRESS}>`,
+        to: user.email,
+        subject: "Verify your email",
+        react: VerifyEmail({ username: user.name, verifyUrl: url }),
+      });
+    },
+  },
+  socialProviders: {
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID as string,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+    },
+  },
   database: createPool({
     host: envs.DATABASE_HOST,
     port: envs.DATABASE_PORT,
@@ -46,46 +117,7 @@ export const auth = betterAuth({
       },
     },
   },
-  emailAndPassword: {
-    enabled: true,
-    sendResetPassword: async ({ user, url }) => {
-      const response = await resend.emails.send({
-        from: `${envs.EMAIL_SENDER_NAME} <${envs.EMAIL_SENDER_ADDRESS}>`,
-        to: user.email,
-        subject: "Reset your password",
-        react: ForgotPasswordEmail({
-          username: user.name,
-          resetUrl: url,
-          userEmail: user.email,
-        }),
-      });
 
-      if (response.error) {
-        console.error("Failed to send email:", response.error);
-      } else {
-        console.log("Email sent successfully:", response.data);
-      }
-    },
-    requireEmailVerification: true,
-  },
-
-  emailVerification: {
-    sendVerificationEmail: async ({ user, url }) => {
-      await resend.emails.send({
-        from: `${envs.EMAIL_SENDER_NAME} <${envs.EMAIL_SENDER_ADDRESS}>`,
-        to: user.email,
-        subject: "Verify your email",
-        react: VerifyEmail({ username: user.name, verifyUrl: url }),
-      });
-    },
-    sendOnSignUp: true,
-  },
-  socialProviders: {
-    google: {
-      clientId: process.env.GOOGLE_CLIENT_ID as string,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
-    },
-  },
   session: {
     cookieCache: {
       enabled: true,
@@ -93,6 +125,15 @@ export const auth = betterAuth({
     },
   },
   plugins: [
+    twoFactor(),
+
+    adminPlugin({
+      ac,
+      roles: {
+        admin,
+        user,
+      },
+    }),
     organization({
       sendInvitationEmail: async (data) => {
         const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL}/api/accept-invitation/${data.id}`;
@@ -109,11 +150,6 @@ export const auth = betterAuth({
             inviteLink,
           }),
         });
-      },
-      roles: {
-        owner,
-        admin,
-        member,
       },
     }),
     lastLoginMethod(),
