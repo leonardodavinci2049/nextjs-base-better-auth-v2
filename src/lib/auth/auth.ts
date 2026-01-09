@@ -1,5 +1,5 @@
+import { passkey } from "@better-auth/passkey";
 import { betterAuth } from "better-auth";
-
 import { nextCookies } from "better-auth/next-js";
 import { lastLoginMethod, organization, twoFactor } from "better-auth/plugins";
 import { admin as adminPlugin } from "better-auth/plugins/admin";
@@ -152,6 +152,7 @@ export const auth = betterAuth({
         });
       },
     }),
+    passkey(),
     lastLoginMethod(),
     nextCookies(),
   ],

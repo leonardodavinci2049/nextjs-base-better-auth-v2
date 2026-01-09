@@ -62,6 +62,7 @@ export const signUp = async (
         email,
         password,
         name: username,
+        favoriteNumber: 0,
       },
     });
 

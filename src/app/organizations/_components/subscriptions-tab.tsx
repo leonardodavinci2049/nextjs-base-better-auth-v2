@@ -1,9 +1,7 @@
 "use client";
 
-import type { Subscription } from "@better-auth/stripe";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { BetterAuthActionButton } from "@/app/auth/login/better-auth-action-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,181 +11,253 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { authClient } from "@/lib/auth/auth-client";
-import { PLAN_TO_PRICE, STRIPE_PLANS } from "@/lib/auth/stripe";
+import {
+  getPlanByName,
+  isSubscriptionActive,
+  PLAN_TO_PRICE,
+  SUBSCRIPTION_PLANS,
+  SUBSCRIPTION_STATUS,
+} from "@/lib/auth/plans";
+import {
+  createSubscription,
+  getMySubscription,
+  updateMySubscription,
+} from "@/server/subscription";
+import type { Subscription } from "@/services/db/auth/dto/auth.dto";
 
-const currencyFormatter = new Intl.NumberFormat("en-US", {
+const currencyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
-  currency: "USD",
+  currency: "BRL",
 });
 
 export function SubscriptionsTab() {
-  const { data: activeOrganization } = authClient.useActiveOrganization();
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isPending, startTransition] = useTransition();
 
+  // Carrega a assinatura do usuário
   useEffect(() => {
-    if (activeOrganization == null) {
-      return setSubscriptions([]);
+    async function loadSubscription() {
+      setIsLoading(true);
+      const result = await getMySubscription();
+
+      if (result.success && result.data) {
+        setSubscription(result.data);
+      } else {
+        setSubscription(null);
+      }
+      setIsLoading(false);
     }
 
-    authClient.subscription
-      .list({ query: { referenceId: activeOrganization.id } })
-      .then((result) => {
-        if (result.error) {
-          setSubscriptions([]);
-          toast.error("Failed to load subscriptions");
-          return;
-        }
+    loadSubscription();
+  }, []);
 
-        setSubscriptions(result.data);
+  const activePlan = subscription
+    ? getPlanByName(subscription.plan)
+    : undefined;
+
+  const isActive = subscription
+    ? isSubscriptionActive(subscription.status)
+    : false;
+
+  async function handleCancelSubscription() {
+    if (!subscription) {
+      toast.error("Nenhuma assinatura ativa");
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await updateMySubscription({
+        status: SUBSCRIPTION_STATUS.CANCELLED,
       });
-  }, [activeOrganization]);
 
-  const activeSubscription = subscriptions.find(
-    (sub) => sub.status === "active" || sub.status === "trialing",
-  );
-  const activePlan = STRIPE_PLANS.find(
-    (plan) => plan.name === activeSubscription?.plan,
-  );
-
-  async function handleBillingPortal() {
-    if (activeOrganization == null) {
-      return { error: { message: "No active organization" } };
-    }
-
-    const res = await authClient.subscription.billingPortal({
-      referenceId: activeOrganization.id,
-      returnUrl: window.location.href,
-    });
-
-    if (res.error == null) {
-      window.location.href = res.data.url;
-    }
-
-    return res;
-  }
-
-  function handleCancelSubscription() {
-    if (activeOrganization == null) {
-      return Promise.resolve({ error: { message: "No active organization" } });
-    }
-
-    if (activeSubscription == null) {
-      return Promise.resolve({ error: { message: "No active subscription" } });
-    }
-
-    return authClient.subscription.cancel({
-      subscriptionId: activeSubscription.id,
-      referenceId: activeOrganization.id,
-      returnUrl: window.location.href,
+      if (result.success) {
+        setSubscription((prev) =>
+          prev ? { ...prev, status: SUBSCRIPTION_STATUS.CANCELLED } : null,
+        );
+        toast.success("Assinatura cancelada com sucesso");
+      } else {
+        toast.error(result.error || "Erro ao cancelar assinatura");
+      }
     });
   }
 
-  function handleSubscriptionChange(plan: string) {
-    if (activeOrganization == null) {
-      return Promise.resolve({ error: { message: "No active organization" } });
-    }
+  async function handleSubscriptionChange(planName: string) {
+    startTransition(async () => {
+      if (subscription) {
+        // Atualiza assinatura existente
+        const result = await updateMySubscription({
+          plan: planName,
+          status: SUBSCRIPTION_STATUS.ACTIVE,
+        });
 
-    return authClient.subscription.upgrade({
-      plan,
-      subscriptionId: activeSubscription?.id,
-      referenceId: activeOrganization.id,
-      returnUrl: window.location.href,
-      successUrl: window.location.href,
-      cancelUrl: window.location.href,
+        if (result.success) {
+          setSubscription((prev) =>
+            prev
+              ? { ...prev, plan: planName, status: SUBSCRIPTION_STATUS.ACTIVE }
+              : null,
+          );
+          toast.success("Plano atualizado com sucesso");
+        } else {
+          toast.error(result.error || "Erro ao atualizar plano");
+        }
+      } else {
+        // Cria nova assinatura
+        const result = await createSubscription({
+          plan: planName,
+          status: SUBSCRIPTION_STATUS.ACTIVE,
+        });
+
+        if (result.success && result.data) {
+          setSubscription(result.data);
+          toast.success("Assinatura criada com sucesso");
+        } else {
+          toast.error(result.error || "Erro ao criar assinatura");
+        }
+      }
     });
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
-      {activeSubscription && activePlan && (
+      {subscription && isActive && activePlan && (
         <Card>
           <CardHeader>
-            <CardTitle>Current Subscription</CardTitle>
+            <CardTitle>Assinatura Atual</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <h3 className="text-lg font-semibold capitalize">
-                    {activeSubscription.plan} Plan
+                    Plano {activePlan.displayName}
                   </h3>
-                  {activeSubscription.priceId && (
-                    <Badge variant="secondary">
-                      {currencyFormatter.format(
-                        PLAN_TO_PRICE[activeSubscription.plan],
-                      )}
-                    </Badge>
-                  )}
+                  <Badge variant="secondary">
+                    {currencyFormatter.format(PLAN_TO_PRICE[subscription.plan])}
+                    /mês
+                  </Badge>
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {activePlan.limits.projects} projects included
+                  {activePlan.limits.projects === -1
+                    ? "Projetos ilimitados"
+                    : `${activePlan.limits.projects} projetos incluídos`}
                 </p>
-                {activeSubscription.periodEnd && (
+                {subscription.approvedAt && (
                   <p className="text-sm text-muted-foreground">
-                    {activeSubscription.cancelAtPeriodEnd
-                      ? "Cancels on "
-                      : "Renews on "}
-                    {activeSubscription.periodEnd.toLocaleDateString()}
+                    Ativo desde{" "}
+                    {new Date(subscription.approvedAt).toLocaleDateString(
+                      "pt-BR",
+                    )}
                   </p>
                 )}
               </div>
-              <BetterAuthActionButton
-                variant="outline"
-                action={handleBillingPortal}
-                className="flex items-center gap-2"
+              <Badge
+                variant={isActive ? "default" : "destructive"}
+                className="capitalize"
               >
-                Billing Portal
-              </BetterAuthActionButton>
+                {subscription.status}
+              </Badge>
             </div>
           </CardContent>
         </Card>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {STRIPE_PLANS.map((plan) => (
-          <Card key={plan.name} className="relative">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-xl capitalize">
-                  {plan.name}
-                </CardTitle>
-                <div className="text-right">
-                  <div className="text-2xl font-bold">
-                    {currencyFormatter.format(PLAN_TO_PRICE[plan.name])}
+      {subscription && !isActive && (
+        <Card className="border-yellow-500/50 bg-yellow-500/10">
+          <CardHeader>
+            <CardTitle className="text-yellow-700">
+              Assinatura Inativa
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Sua assinatura está com status:{" "}
+              <strong className="capitalize">{subscription.status}</strong>.
+              Selecione um plano abaixo para reativar.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid gap-4 md:grid-cols-3">
+        {SUBSCRIPTION_PLANS.map((plan) => {
+          const isCurrentPlan = subscription?.plan === plan.name && isActive;
+
+          return (
+            <Card
+              key={plan.name}
+              className={`relative ${isCurrentPlan ? "border-primary" : ""}`}
+            >
+              {isCurrentPlan && (
+                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                  <Badge variant="default">Plano Atual</Badge>
+                </div>
+              )}
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xl capitalize">
+                    {plan.displayName}
+                  </CardTitle>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold">
+                      {currencyFormatter.format(plan.price)}
+                    </div>
+                    <div className="text-xs text-muted-foreground">por mês</div>
                   </div>
                 </div>
-              </div>
-              <CardDescription>
-                Up to {plan.limits.projects} projects
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {activeSubscription?.plan === plan.name ? (
-                activeSubscription.cancelAtPeriodEnd ? (
-                  <Button disabled variant="outline" className="w-full">
-                    Current Plan
-                  </Button>
-                ) : (
-                  <BetterAuthActionButton
+                <CardDescription>
+                  {plan.limits.projects === -1
+                    ? "Projetos ilimitados"
+                    : `Até ${plan.limits.projects} projetos`}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <ul className="text-sm space-y-2">
+                  {plan.features.map((feature, index) => (
+                    <li
+                      key={`${plan.name}-feature-${index}`}
+                      className="flex items-center gap-2"
+                    >
+                      <span className="text-green-500">✓</span>
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+
+                {isCurrentPlan ? (
+                  <Button
                     variant="destructive"
                     className="w-full"
-                    action={handleCancelSubscription}
+                    onClick={handleCancelSubscription}
+                    disabled={isPending}
                   >
-                    Cancel Subscription
-                  </BetterAuthActionButton>
-                )
-              ) : (
-                <BetterAuthActionButton
-                  action={() => handleSubscriptionChange(plan.name)}
-                  className="w-full"
-                >
-                  {activeSubscription == null ? "Subscribe" : "Change Plan"}
-                </BetterAuthActionButton>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+                    {isPending ? "Cancelando..." : "Cancelar Assinatura"}
+                  </Button>
+                ) : (
+                  <Button
+                    className="w-full"
+                    onClick={() => handleSubscriptionChange(plan.name)}
+                    disabled={isPending}
+                  >
+                    {isPending
+                      ? "Processando..."
+                      : subscription && isActive
+                        ? "Trocar para este plano"
+                        : "Assinar"}
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );
