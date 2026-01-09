@@ -16,11 +16,14 @@ import {
   mapMemberEntityToDto,
   mapMemberWithUserEntityToDto,
   mapOrganizationEntityToDto,
+  mapSubscriptionEntityToDto,
   mapUserEntityToDto,
   type Organization,
   type OrganizationEntity,
   type OrganizationWithMembers,
   type ServiceResponse,
+  type Subscription,
+  type SubscriptionEntity,
   type User,
   type UserEntity,
 } from "./types/auth.types";
@@ -673,6 +676,292 @@ async function findOrganizationBySlugWithMembers(params: {
 }
 
 // ============================================================================
+// Subscription Methods
+// ============================================================================
+
+/**
+ * Creates a new subscription for a user
+ *
+ * Replaces: prisma.subscription.create({ data: { userId, plan, status } })
+ *
+ * @example
+ * ```typescript
+ * const result = await AuthService.createSubscription({
+ *   userId: "user-123",
+ *   plan: "premium",
+ *   status: "active"
+ * });
+ * ```
+ */
+async function createSubscription(params: {
+  userId: string;
+  plan: string;
+  status: string;
+  approvedAt?: Date;
+}): Promise<ServiceResponse<Subscription>> {
+  try {
+    validateId(params.userId, "userId");
+
+    if (!params.plan || params.plan.trim().length === 0) {
+      throw new AuthValidationError("Plan é obrigatório", "plan");
+    }
+
+    if (!params.status || params.status.trim().length === 0) {
+      throw new AuthValidationError("Status é obrigatório", "status");
+    }
+
+    const id = `sub_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const now = new Date();
+
+    const query = `
+      INSERT INTO ${AUTH_TABLES.SUBSCRIPTION}
+        (id, userId, plan, status, approvedAt, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `;
+
+    await dbService.ModifyExecute(query, [
+      id,
+      params.userId,
+      params.plan,
+      params.status,
+      params.approvedAt || null,
+      now,
+    ]);
+
+    return {
+      success: true,
+      data: {
+        id,
+        userId: params.userId,
+        plan: params.plan,
+        status: params.status,
+        approvedAt: params.approvedAt || null,
+        createdAt: now,
+      },
+      error: null,
+    };
+  } catch (error) {
+    return handleError<Subscription>(error, "createSubscription");
+  }
+}
+
+/**
+ * Finds a subscription by user ID
+ *
+ * Replaces: prisma.subscription.findFirst({ where: { userId } })
+ *
+ * @example
+ * ```typescript
+ * const response = await AuthService.findSubscriptionByUserId({
+ *   userId: "user-123"
+ * });
+ * ```
+ */
+async function findSubscriptionByUserId(params: {
+  userId: string;
+}): Promise<ServiceResponse<Subscription | null>> {
+  try {
+    validateId(params.userId, "userId");
+
+    const query = `
+      SELECT 
+        id, userId, plan, status, approvedAt, createdAt
+      FROM ${AUTH_TABLES.SUBSCRIPTION}
+      WHERE userId = ?
+      ORDER BY createdAt DESC
+      LIMIT 1
+    `;
+
+    const results = await dbService.selectExecute<SubscriptionEntity>(query, [
+      params.userId,
+    ]);
+
+    if (results.length === 0) {
+      return {
+        success: true,
+        data: null,
+        error: null,
+      };
+    }
+
+    return {
+      success: true,
+      data: mapSubscriptionEntityToDto(results[0]),
+      error: null,
+    };
+  } catch (error) {
+    return handleError<Subscription | null>(error, "findSubscriptionByUserId");
+  }
+}
+
+/**
+ * Finds a subscription by ID
+ *
+ * Replaces: prisma.subscription.findUnique({ where: { id } })
+ *
+ * @example
+ * ```typescript
+ * const response = await AuthService.findSubscriptionById({
+ *   subscriptionId: "sub-123"
+ * });
+ * ```
+ */
+async function findSubscriptionById(params: {
+  subscriptionId: string;
+}): Promise<ServiceResponse<Subscription | null>> {
+  try {
+    validateId(params.subscriptionId, "subscriptionId");
+
+    const query = `
+      SELECT 
+        id, userId, plan, status, approvedAt, createdAt
+      FROM ${AUTH_TABLES.SUBSCRIPTION}
+      WHERE id = ?
+      LIMIT 1
+    `;
+
+    const results = await dbService.selectExecute<SubscriptionEntity>(query, [
+      params.subscriptionId,
+    ]);
+
+    if (results.length === 0) {
+      return {
+        success: true,
+        data: null,
+        error: null,
+      };
+    }
+
+    return {
+      success: true,
+      data: mapSubscriptionEntityToDto(results[0]),
+      error: null,
+    };
+  } catch (error) {
+    return handleError<Subscription | null>(error, "findSubscriptionById");
+  }
+}
+
+/**
+ * Updates a subscription
+ *
+ * Replaces: prisma.subscription.update({ where: { id }, data: { ... } })
+ *
+ * @example
+ * ```typescript
+ * const result = await AuthService.updateSubscription({
+ *   subscriptionId: "sub-123",
+ *   plan: "premium",
+ *   status: "active"
+ * });
+ * ```
+ */
+async function updateSubscription(params: {
+  subscriptionId: string;
+  plan?: string;
+  status?: string;
+  approvedAt?: Date | null;
+}): Promise<ModifyResponse> {
+  try {
+    validateId(params.subscriptionId, "subscriptionId");
+
+    const updates: string[] = [];
+    const values: (string | Date | null)[] = [];
+
+    if (params.plan !== undefined) {
+      if (params.plan.trim().length === 0) {
+        throw new AuthValidationError("Plan não pode ser vazio", "plan");
+      }
+      updates.push("plan = ?");
+      values.push(params.plan);
+    }
+
+    if (params.status !== undefined) {
+      if (params.status.trim().length === 0) {
+        throw new AuthValidationError("Status não pode ser vazio", "status");
+      }
+      updates.push("status = ?");
+      values.push(params.status);
+    }
+
+    if (params.approvedAt !== undefined) {
+      updates.push("approvedAt = ?");
+      values.push(params.approvedAt);
+    }
+
+    if (updates.length === 0) {
+      return {
+        success: false,
+        affectedRows: 0,
+        error: "Nenhum campo para atualizar",
+      };
+    }
+
+    values.push(params.subscriptionId);
+
+    const query = `
+      UPDATE ${AUTH_TABLES.SUBSCRIPTION}
+      SET ${updates.join(", ")}
+      WHERE id = ?
+    `;
+
+    const result = await dbService.ModifyExecute(query, values);
+
+    return {
+      success: result.affectedRows > 0,
+      affectedRows: result.affectedRows,
+      error:
+        result.affectedRows === 0
+          ? "Subscription não encontrada ou já atualizada"
+          : null,
+    };
+  } catch (error) {
+    return handleModifyError(error, "updateSubscription");
+  }
+}
+
+/**
+ * Deletes a subscription by ID
+ *
+ * Replaces: prisma.subscription.delete({ where: { id } })
+ *
+ * @example
+ * ```typescript
+ * const result = await AuthService.deleteSubscription({ subscriptionId: "sub-123" });
+ * if (result.success) {
+ *   console.log(`Affected rows: ${result.affectedRows}`);
+ * }
+ * ```
+ */
+async function deleteSubscription(params: {
+  subscriptionId: string;
+}): Promise<ModifyResponse> {
+  try {
+    validateId(params.subscriptionId, "subscriptionId");
+
+    const query = `
+      DELETE FROM ${AUTH_TABLES.SUBSCRIPTION}
+      WHERE id = ?
+    `;
+
+    const result = await dbService.ModifyExecute(query, [
+      params.subscriptionId,
+    ]);
+
+    return {
+      success: result.affectedRows > 0,
+      affectedRows: result.affectedRows,
+      error:
+        result.affectedRows === 0
+          ? "Subscription não encontrada ou já deletada"
+          : null,
+    };
+  } catch (error) {
+    return handleModifyError(error, "deleteSubscription");
+  }
+}
+
+// ============================================================================
 // Compound Methods (for complex operations)
 // ============================================================================
 
@@ -867,6 +1156,13 @@ export const AuthService = {
   findUserOrganizations,
   findActiveOrganization,
   findNonMemberUsers,
+
+  // Subscription Methods
+  createSubscription,
+  findSubscriptionByUserId,
+  findSubscriptionById,
+  updateSubscription,
+  deleteSubscription,
 } as const;
 
 // Export default for easier import
@@ -880,5 +1176,6 @@ export type {
   Organization,
   OrganizationWithMembers,
   ServiceResponse,
+  Subscription,
   User,
 } from "./types/auth.types";

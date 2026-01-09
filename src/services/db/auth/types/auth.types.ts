@@ -11,6 +11,7 @@ import type {
   OrganizationRole,
   OrganizationWithMembers,
   Session,
+  Subscription,
   Team,
   TeamMember,
   TeamMemberWithUser,
@@ -37,6 +38,7 @@ export type {
   TeamMember,
   TeamMemberWithUser,
   OrganizationRole,
+  Subscription,
 };
 
 // ============================================================================
@@ -55,6 +57,7 @@ export const AUTH_TABLES = {
   TEAM: "team",
   TEAM_MEMBER: "teammember",
   ORGANIZATION_ROLE: "organizationrole",
+  SUBSCRIPTION: "subscription",
 } as const;
 
 export type AuthTable = (typeof AUTH_TABLES)[keyof typeof AUTH_TABLES];
@@ -265,6 +268,18 @@ export interface OrganizationRoleEntity extends RowDataPacket {
   permission: string | null;
   createdAt: Date | null;
   updatedAt: Date | null;
+}
+
+/**
+ * Representa uma subscription (assinatura do usuário)
+ */
+export interface SubscriptionEntity extends RowDataPacket {
+  id: string;
+  userId: string;
+  plan: string;
+  status: string;
+  approvedAt: Date | null;
+  createdAt: Date | null;
 }
 
 // ============================================================================
@@ -688,5 +703,21 @@ export function mapOrganizationRoleEntityToDto(
     permission: entity.permission,
     createdAt: entity.createdAt ? new Date(entity.createdAt) : null,
     updatedAt: entity.updatedAt ? new Date(entity.updatedAt) : null,
+  };
+}
+
+/**
+ * Mapeia uma entidade SubscriptionEntity para o DTO Subscription
+ */
+export function mapSubscriptionEntityToDto(
+  entity: SubscriptionEntity,
+): Subscription {
+  return {
+    id: entity.id,
+    userId: entity.userId,
+    plan: entity.plan,
+    status: entity.status,
+    approvedAt: entity.approvedAt ? new Date(entity.approvedAt) : null,
+    createdAt: entity.createdAt ? new Date(entity.createdAt) : null,
   };
 }

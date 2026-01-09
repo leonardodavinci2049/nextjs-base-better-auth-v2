@@ -187,3 +187,15 @@ export interface OrganizationRole {
   createdAt: Date | null;
   updatedAt: Date | null;
 }
+
+/**
+ * DTO para subscription (assinatura do usuário)
+ */
+export interface Subscription {
+  id: string;
+  userId: string;
+  plan: string;
+  status: string;
+  approvedAt: Date | null;
+  createdAt: Date | null;
+}
