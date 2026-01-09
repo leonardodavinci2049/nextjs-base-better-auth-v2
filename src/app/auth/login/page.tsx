@@ -12,11 +12,11 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { authClient } from "@/lib/auth/auth-client";
+import { SocialAuthButtons } from "../../../components/auth/social-auth-buttons";
 import { EmailVerification } from "./_components/email-verification";
 import { ForgotPassword } from "./_components/forgot-password";
 import { SignInTab } from "./_components/sign-in-tab";
 import { SignUpTab } from "./_components/sign-up-tab";
-import { SocialAuthButtons } from "../../../components/auth/social-auth-buttons";
 
 type Tab = "signin" | "signup" | "email-verification" | "forgot-password";
 
